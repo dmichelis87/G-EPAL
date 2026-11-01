@@ -399,12 +399,14 @@ const CL = (() => {
   const words = s => norm(s).match(/[\p{L}\p{N}]+/gu) || [];
   const its = DATA.items, par = its.map((_, i) => i);
   const f = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
-  const ex = its.map(it => [it.q, ...(it.rows || []).map(r => r.t), ...(it.opts || []), it.ctx].map(s => words(s).join(' ')).join('|'));
+  const ex = its.map(it => [it.q, ...(it.rows || []).map(r => r.t), ...(it.opts || []), it.ctx].map(s => words(s).join(' ')).join('|') + '|' + (it.img || ''));
   const fz = new Set(['tf', 'mc', 'fill', 'fillp', 'open']);
-  const tk = its.map(it => fz.has(it.k) ? new Set(words(it.q + (['mc', 'fill'].includes(it.k) ? ' ' + it.opts[it.a] : '')).filter(w => w.length >= 3)) : null);
+  const set = s => new Set(words(s).filter(w => w.length >= 3));
+  const tk = its.map(it => fz.has(it.k) ? set(it.q + (['mc', 'fill'].includes(it.k) ? ' ' + it.opts[it.a] : '')) : null);
+  const cx = its.map(it => set(it.ctx));   // ίδια ερώτηση με άλλο εισαγωγικό κείμενο = άλλη ερώτηση
   const jac = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n / (a.size + b.size - n); };
   for (let i = 0; i < its.length; i++) for (let j = i + 1; j < its.length; j++)
-    if (ex[i] === ex[j] || (tk[i] && tk[j] && tk[i].size && tk[j].size && jac(tk[i], tk[j]) >= .75)) par[f(i)] = f(j);
+    if (ex[i] === ex[j] || (tk[i] && tk[j] && tk[i].size && tk[j].size && (its[i].img || '') === (its[j].img || '') && (!cx[i].size || !cx[j].size || jac(cx[i], cx[j]) >= .6) && jac(tk[i], tk[j]) >= .75)) par[f(i)] = f(j);
   const m = {}; its.forEach((it, i) => m[it.id] = its[f(i)].id); return m;
 })();
 const seenN = u => Math.min(...u.ids.map(id => S.seen[CL[id]] || 0));
@@ -480,8 +482,8 @@ function buildExam(sel) {
   const sum = o => o.reduce((a, u) => a + u.p, 0);
   // Δ: ολόκληρο Θέμα 4ο της τράπεζας· όσα συνδυάζουν ενότητες έχουν τριπλάσια πιθανότητα
   const t4 = Object.values(DATA.themes).filter(th => th.t === 4 && th.items.every(id => whole(ITEM[id]))).map(th => mkUnit(th.items, sel));
-  const d0 = Math.min(...t4.map(seenN)), t4m = t4.filter(u => seenN(u) === d0);
-  P['Δ'] = t4m.length ? [wpick(t4m, t4m.map(u => u.secs.length > 1 ? 3 : 1))] : [];
+  const d0 = Math.min(...t4.map(seenN)), dm = t4.filter(u => seenN(u) === d0);
+  P['Δ'] = dm.length ? [wpick(dm, dm.map(u => u.secs.length > 1 ? 3 : 1))] : [];
   P['Δ'].forEach(u => { X.th.add(u.th); u.ids.forEach(id => X.cl.add(CL[id])); inc(X.ch, u.ch); u.secs.forEach(x => inc(X.sec, x)); });
   // Γ: άσκηση υπολογισμών από άλλη ενότητα· αν βγει μικρή, συμπληρώνεται με δεύτερη (ή τρίτη) από άλλη ενότητα
   let gp = DATA.items.filter(it => it.k === 'calc' && whole(it) && it.secs.every(s => EXER.has(s))).map(u1);
